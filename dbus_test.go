@@ -1,13 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
-	"github.com/godbus/dbus/v5/introspect"
 )
 
 func TestList(t *testing.T) {
@@ -37,9 +35,22 @@ func TestBluez(t *testing.T) {
 		panic(err)
 	}
 	defer conn.Close()
-	obj := conn.Object("org.bluez", "/")
+	err = conn.AddMatchSignal(
+		dbus.WithMatchMember("PropertiesChanged"),
+		dbus.WithMatchSender(":1.4"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := make(chan *dbus.Signal, 10)
+	conn.Signal(c)
+	for v := range c {
+		t.Logf("%+v", v)
+	}
+	
+	// obj := conn.Object("org.bluez", "/")
 
-	t.Log(obj)
+	// t.Log(obj)
 
 	// ----CodeSnipets
 	// 	var s map[dbus.ObjectPath]map[string]map[string]dbus.Variant
@@ -60,16 +71,31 @@ func TestBluez(t *testing.T) {
 	// // fmt.Println(s)
 }
 
-func TestWeird(t *testing.T) {
+func TestIntrospect(t *testing.T) {
 	conn, err := dbus.ConnectSystemBus()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	defer conn.Close()
+	obj := conn.Object(":1.4", "/")
 
-	node, err := introspect.Call(conn.Object(":1.4", "/"))
-	data, _ := json.MarshalIndent(node, "", "  ")
-	os.Stdout.Write(data)
+	call := obj.AddMatchSignal(
+		"org.freedesktop.DBus.ObjectManager",
+		"InterfacesAdded",
+	)
+	
+	c := make(chan *dbus.Signal, 10)
+	call.Store(&c)
+	for v := range c {
+		t.Logf("%+v", v)
+	}
+	
+	// node, err := introspect.Call(obj)
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	// data, _ := json.MarshalIndent(node, "", "  ")
+	// os.Stdout.Write(data)
 }
 
 func TestBluezObj(t *testing.T) {
