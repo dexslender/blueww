@@ -1,12 +1,15 @@
-OUT = "bin"
+OUT = "bin/blueww"
 
 all: build
 build:
-	go build -o $(OUT)/orb .
+	go build -o $(OUT) .
+exec:
+	@echo "Executing binary:"
+	./$(OUT)
 run:
 	go run .
 clean:
-	rm $(OUT)/orb
+	rm $(OUT)
 
 test:
 	go test -v .
