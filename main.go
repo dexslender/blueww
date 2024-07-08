@@ -10,9 +10,10 @@ import (
 
 type Bluetooth struct {
 	Device
-	Powered  bool
-	Pairable bool
-	Devices  []Device
+	Connected *Device
+	Powered   bool
+	Pairable  bool
+	Devices   []Device
 }
 
 type Device struct {
@@ -21,7 +22,7 @@ type Device struct {
 	Connected bool
 }
 
-type DeviceInfo struct {
+type deviceInfo struct {
 	Address   string
 	Alias     string
 	Interface string
@@ -29,7 +30,7 @@ type DeviceInfo struct {
 
 var bluetooth Bluetooth
 
-var Listening map[dbus.ObjectPath]DeviceInfo = make(map[dbus.ObjectPath]DeviceInfo)
+var Listening map[dbus.ObjectPath]deviceInfo = make(map[dbus.ObjectPath]deviceInfo)
 
 func main() {
 	conn, err := dbus.ConnectSystemBus()
@@ -65,20 +66,20 @@ func main() {
 			Update()
 		} else if connected, ok := update["Connected"]; ok {
 			if connected.Value() == true {
-				bluetooth.Connected = true
 				dev := Listening[v.Path]
 				for i := range bluetooth.Devices {
 					if bluetooth.Devices[i].Address == dev.Address {
 						bluetooth.Devices[i].Connected = true
+						bluetooth.Connected = &bluetooth.Devices[i]
 					}
 				}
 				Update()
 			} else {
-				bluetooth.Connected = false
 				dev := Listening[v.Path]
 				for i := range bluetooth.Devices {
 					if bluetooth.Devices[i].Address == dev.Address {
 						bluetooth.Devices[i].Connected = false
+						bluetooth.Connected = nil
 					}
 				}
 				Update()
@@ -111,16 +112,17 @@ func GetInitial(conn *dbus.Conn) Bluetooth {
 						bluetooth.Pairable = Get[bool](prop["Pairable"])
 					}
 				} else {
-					if ok := Get[bool](prop["Connected"]); ok {
-						bluetooth.Connected = ok
-					}
-					bluetooth.Devices = append(bluetooth.Devices, Device{
+					dev := Device{
 						Alias:     Get[string](alias),
 						Address:   Get[string](prop["Address"]),
 						Connected: Get[bool](prop["Connected"]),
-					})
+					}
+					bluetooth.Devices = append(bluetooth.Devices, dev)
+					if dev.Connected {
+						bluetooth.Connected = &dev
+					}
 				}
-				Listening[path] = DeviceInfo{
+				Listening[path] = deviceInfo{
 					Address:   Get[string](prop["Address"]),
 					Interface: iface,
 					Alias:     Get[string](alias),
